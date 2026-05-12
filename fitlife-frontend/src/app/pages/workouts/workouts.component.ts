@@ -27,6 +27,7 @@ export class WorkoutsComponent implements OnInit {
     weightLbs: null as number | null,
     durationMin: null as number | null,
     distanceKm: null as number | null,
+    caloriesBurned: null as number | null,
     notes: ''
   };
 
@@ -58,6 +59,7 @@ export class WorkoutsComponent implements OnInit {
         weightLbs: workout.weightLbs,
         durationMin: workout.durationMin,
         distanceKm: workout.distanceKm,
+        caloriesBurned: workout.caloriesBurned,
         notes: workout.notes
       };
     } else {
@@ -77,6 +79,8 @@ export class WorkoutsComponent implements OnInit {
     if (this.fieldVisibility.reps && this.form.reps !== null && this.form.reps <= 0) this.errors['reps'] = 'Reps must be positive';
     if (this.fieldVisibility.duration && this.form.exerciseType === 'Cardio' && (!this.form.durationMin || this.form.durationMin <= 0))
       this.errors['duration'] = 'Duration is required for cardio';
+    if (!this.form.caloriesBurned || this.form.caloriesBurned <= 0)
+      this.errors['calories'] = 'Calories burned is required — enter the value from your fitness device';
     if (Object.keys(this.errors).length > 0) return;
 
     try {
@@ -99,6 +103,6 @@ export class WorkoutsComponent implements OnInit {
   }
 
   private resetForm(): void {
-    this.form = { exerciseName: '', exerciseType: 'Strength', sets: null, reps: null, weightLbs: null, durationMin: null, distanceKm: null, notes: '' };
+    this.form = { exerciseName: '', exerciseType: 'Strength', sets: null, reps: null, weightLbs: null, durationMin: null, distanceKm: null, caloriesBurned: null, notes: '' };
   }
 }

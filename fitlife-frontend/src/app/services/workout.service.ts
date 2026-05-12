@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { ToastService } from './toast.service';
 
 export interface Workout {
   id: number;
@@ -13,7 +14,7 @@ export interface Workout {
   distanceKm: number | null;
   notes: string;
   date: string;
-  caloriesBurned: number;
+  caloriesBurned: number | null;
 }
 
 export type ExerciseCategory = 'Strength' | 'Cardio' | 'Flexibility' | 'HIIT' | 'Sports' | 'Other';
@@ -28,10 +29,13 @@ export interface FieldVisibility {
 
 @Injectable({ providedIn: 'root' })
 export class WorkoutService {
+  /** Today's workouts only - resets each day */
   workouts = signal<Workout[]>([]);
+  /** Historical workouts for the history page */
+  historyWorkouts = signal<Workout[]>([]);
   private apiUrl = `${environment.apiUrl}/workouts`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private toast: ToastService) {}
 
   getFieldVisibility(type: ExerciseCategory): FieldVisibility {
     switch (type) {
@@ -50,9 +54,22 @@ export class WorkoutService {
     }
   }
 
+  /** Loads today's workouts only (daily reset) */
   loadWorkouts(): void {
     this.http.get<Workout[]>(this.apiUrl).subscribe({
-      next: (data) => this.workouts.set(data)
+      next: (data) => this.workouts.set(data),
+      error: (err) => {
+        const message = err.error?.error || 'Failed to load workouts';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  /** Load workouts for a date range (for history page) */
+  loadHistory(start: string, end: string): void {
+    this.http.get<Workout[]>(`${this.apiUrl}/history`, { params: { start, end } }).subscribe({
+      next: (data) => this.historyWorkouts.set(data),
+      error: (err) => this.toast.error(err.error?.error || 'Failed to load workout history')
     });
   }
 
@@ -61,9 +78,14 @@ export class WorkoutService {
       this.http.post<Workout>(this.apiUrl, workout).subscribe({
         next: (w) => {
           this.workouts.update(list => [w, ...list]);
+          this.toast.success('Workout added successfully');
           resolve(w);
         },
-        error: reject
+        error: (err) => {
+          const message = err.error?.error || 'Failed to add workout';
+          this.toast.error(message);
+          reject(err);
+        }
       });
     });
   }
@@ -73,34 +95,46 @@ export class WorkoutService {
       this.http.put<Workout>(`${this.apiUrl}/${id}`, updates).subscribe({
         next: (w) => {
           this.workouts.update(list => list.map(x => x.id === id ? w : x));
+          this.toast.success('Workout updated successfully');
           resolve(w);
         },
-        error: reject
+        error: (err) => {
+          const message = err.error?.error || 'Failed to update workout';
+          this.toast.error(message);
+          reject(err);
+        }
       });
     });
   }
 
   deleteWorkout(id: number): void {
     this.http.delete(`${this.apiUrl}/${id}`).subscribe({
-      next: () => this.workouts.update(list => list.filter(w => w.id !== id))
+      next: () => {
+        this.workouts.update(list => list.filter(w => w.id !== id));
+        this.toast.success('Workout deleted successfully');
+      },
+      error: (err) => {
+        const message = err.error?.error || 'Failed to delete workout';
+        this.toast.error(message);
+      }
     });
   }
 
+  /** Today's workouts are already loaded via the default endpoint */
   getTodayWorkouts(): Workout[] {
-    const today = new Date().toISOString().split('T')[0];
-    return this.workouts().filter(w => w.date?.split('T')[0] === today);
+    return this.workouts();
   }
 
   getTotalCaloriesBurned(): number {
-    return this.getTodayWorkouts().reduce((sum, w) => sum + w.caloriesBurned, 0);
+    return this.workouts().reduce((sum, w) => sum + (w.caloriesBurned ?? 0), 0);
   }
 
   getWorkoutCount(): number {
-    return this.getTodayWorkouts().length;
+    return this.workouts().length;
   }
 
   getWorkoutsByDateRange(start: string, end: string): Workout[] {
-    return this.workouts().filter(w => {
+    return this.historyWorkouts().filter(w => {
       const d = w.date?.split('T')[0];
       return d && d >= start && d <= end;
     });
@@ -112,7 +146,7 @@ export class WorkoutService {
       const d = new Date(); d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      const count = this.workouts().filter(w => w.date?.split('T')[0] === dateStr).length;
+      const count = this.historyWorkouts().filter(w => w.date?.split('T')[0] === dateStr).length;
       result.push({ label: dayName, count });
     }
     return result;

@@ -5,8 +5,18 @@
 .page-subtitle { color: var(--text-secondary); font-size: var(--font-size-base); }
 
 .filters { margin-bottom: 1.5rem; }
-.filter-row { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
-.filter-row .form-group { min-width: 150px; }
+.filter-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: space-between; }
+
+.period-toggle {
+  display: flex; background: var(--bg-input); border-radius: var(--radius-md); overflow: hidden;
+  border: 1px solid var(--border-color);
+  button {
+    padding: 0.5rem 1.2rem; background: transparent; color: var(--text-secondary);
+    font-weight: 600; font-size: var(--font-size-sm); transition: all var(--transition-fast);
+    &.active { background: #3b82f6; color: #fff; }
+    &:hover:not(.active) { color: var(--text-primary); }
+  }
+}
 
 .tab-toggle {
   display: flex; background: var(--bg-input); border-radius: var(--radius-md); overflow: hidden;

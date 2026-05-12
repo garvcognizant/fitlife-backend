@@ -21,12 +21,17 @@ import { ToastService } from '../../services/toast.service';
         <div class="auth-card">
           @if (!success) {
             <h2 class="auth-title">Reset Password 🔑</h2>
-            <p class="auth-subtitle">Enter your reset token and choose a new password</p>
+            <p class="auth-subtitle">Verify your identity and choose a new password</p>
             <form (ngSubmit)="onSubmit()" class="auth-form">
               <div class="form-group">
-                <label>Reset Token</label>
-                <input type="text" [(ngModel)]="token" name="token"
-                       placeholder="Paste your reset token here" required />
+                <label>Email</label>
+                <input type="email" [(ngModel)]="email" name="email"
+                       placeholder="Your registered email" required />
+              </div>
+              <div class="form-group">
+                <label>Security Answer</label>
+                <input type="text" [(ngModel)]="securityAnswer" name="securityAnswer"
+                       placeholder="Answer to your security question" required />
               </div>
               <div class="form-group">
                 <label>New Password</label>
@@ -92,8 +97,10 @@ import { ToastService } from '../../services/toast.service';
 export class ResetPasswordComponent {
   private authService = inject(AuthService);
   private toast = inject(ToastService);
+  private router = inject(Router);
 
-  token = '';
+  email = '';
+  securityAnswer = '';
   newPassword = '';
   confirmPassword = '';
   isLoading = false;
@@ -102,20 +109,20 @@ export class ResetPasswordComponent {
 
   async onSubmit(): Promise<void> {
     this.errorMsg = '';
-    if (!this.token.trim()) { this.errorMsg = 'Reset token is required'; return; }
+    if (!this.email.trim()) { this.errorMsg = 'Email is required'; return; }
+    if (!this.securityAnswer.trim()) { this.errorMsg = 'Security answer is required'; return; }
     if (this.newPassword.length < 6) { this.errorMsg = 'Password must be at least 6 characters'; return; }
     if (this.newPassword !== this.confirmPassword) { this.errorMsg = 'Passwords do not match'; return; }
 
     this.isLoading = true;
     try {
-      await this.authService.resetPassword(this.token.trim(), this.newPassword);
+      await this.authService.resetPassword(this.email.trim(), this.securityAnswer.trim(), this.newPassword);
       this.success = true;
       this.toast.success('Password reset successfully! 🎉');
     } catch (err: any) {
-      this.errorMsg = typeof err === 'string' ? err : 'Invalid or expired token. Please request a new one.';
+      this.errorMsg = typeof err === 'string' ? err : 'Failed to reset password. Please check your details.';
     } finally {
       this.isLoading = false;
     }
   }
 }
-

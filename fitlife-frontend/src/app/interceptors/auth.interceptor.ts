@@ -2,9 +2,11 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
+  const authService = inject(AuthService);
   const token = localStorage.getItem('fitlife_token');
 
   if (token) {
@@ -16,8 +18,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     catchError((error) => {
       if (error.status === 401) {
-        localStorage.removeItem('fitlife_token');
-        localStorage.removeItem('fitlife_user');
+        authService.logout();
         router.navigate(['/login']);
       }
       return throwError(() => error);

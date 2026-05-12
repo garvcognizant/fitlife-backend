@@ -1,12 +1,19 @@
 package com.fitlife.service;
 
 import com.fitlife.dto.WorkoutDto;
+import com.fitlife.exception.BadRequestException;
+import com.fitlife.exception.ForbiddenException;
+import com.fitlife.exception.NotFoundException;
 import com.fitlife.model.User;
 import com.fitlife.model.Workout;
 import com.fitlife.repository.WorkoutRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Set;
 
@@ -20,12 +27,29 @@ public class WorkoutService {
     private static final Set<String> DURATION_ONLY_TYPES = Set.of("Flexibility", "Sports");
     private static final Set<String> SETS_AND_DURATION_TYPES = Set.of("HIIT");
 
+    public List<WorkoutDto> getTodayWorkouts(Long userId) {
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+        return workoutRepository.findByUserIdAndDateBetween(userId, startOfDay, endOfDay)
+                .stream().map(WorkoutDto::from).toList();
+    }
+
     public List<WorkoutDto> getUserWorkouts(Long userId) {
         return workoutRepository.findByUserIdOrderByDateDesc(userId)
                 .stream().map(WorkoutDto::from).toList();
     }
 
+    public List<WorkoutDto> getWorkoutsByDateRange(Long userId, LocalDate start, LocalDate end) {
+        return workoutRepository.findByUserIdAndDateBetween(userId,
+                start.atStartOfDay(), end.atTime(LocalTime.MAX))
+                .stream().map(WorkoutDto::from).toList();
+    }
+
+    @Transactional
     public WorkoutDto createWorkout(User user, WorkoutDto dto) {
+        if (dto.getCaloriesBurned() == null || dto.getCaloriesBurned() <= 0) {
+            throw new BadRequestException("Calories burned is required. Please enter the value from your fitness device.");
+        }
         Workout workout = Workout.builder()
                 .user(user)
                 .exerciseName(dto.getExerciseName())
@@ -36,21 +60,23 @@ public class WorkoutService {
                 .durationMin(dto.getDurationMin())
                 .distanceKm(dto.getDistanceKm())
                 .notes(dto.getNotes())
-                .caloriesBurned(estimateCalories(dto))
+                .caloriesBurned(dto.getCaloriesBurned())
                 .build();
 
-        // Clear irrelevant fields based on type
         cleanFieldsByType(workout);
-
         return WorkoutDto.from(workoutRepository.save(workout));
     }
 
+    @Transactional
     public WorkoutDto updateWorkout(Long userId, Long workoutId, WorkoutDto dto) {
+        if (dto.getCaloriesBurned() == null || dto.getCaloriesBurned() <= 0) {
+            throw new BadRequestException("Calories burned is required. Please enter the value from your fitness device.");
+        }
         Workout workout = workoutRepository.findById(workoutId)
-                .orElseThrow(() -> new RuntimeException("Workout not found"));
+                .orElseThrow(() -> new NotFoundException("Workout not found"));
 
         if (!workout.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Access denied to this workout");
         }
 
         workout.setExerciseName(dto.getExerciseName());
@@ -61,18 +87,18 @@ public class WorkoutService {
         workout.setDurationMin(dto.getDurationMin());
         workout.setDistanceKm(dto.getDistanceKm());
         workout.setNotes(dto.getNotes());
-        workout.setCaloriesBurned(estimateCalories(dto));
+        workout.setCaloriesBurned(dto.getCaloriesBurned());
 
         cleanFieldsByType(workout);
-
         return WorkoutDto.from(workoutRepository.save(workout));
     }
 
+    @Transactional
     public void deleteWorkout(Long userId, Long workoutId) {
         Workout workout = workoutRepository.findById(workoutId)
-                .orElseThrow(() -> new RuntimeException("Workout not found"));
+                .orElseThrow(() -> new NotFoundException("Workout not found"));
         if (!workout.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Access denied to this workout");
         }
         workoutRepository.delete(workout);
     }
@@ -88,19 +114,5 @@ public class WorkoutService {
         } else if ("Strength".equals(type)) {
             w.setDurationMin(null); w.setDistanceKm(null);
         }
-    }
-
-    private int estimateCalories(WorkoutDto dto) {
-        String type = dto.getExerciseType();
-        if (CARDIO_TYPES.contains(type) && dto.getDurationMin() != null) {
-            return (int) Math.round(dto.getDurationMin() * 8);
-        }
-        if (dto.getSets() != null && dto.getReps() != null) {
-            return dto.getSets() * dto.getReps() * 3;
-        }
-        if (dto.getDurationMin() != null) {
-            return (int) Math.round(dto.getDurationMin() * 5);
-        }
-        return 50;
     }
 }

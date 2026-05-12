@@ -97,6 +97,38 @@ import { ToastService } from '../../services/toast.service';
               }
             </div>
 
+            <div class="form-group">
+              <label for="securityQuestion">Security Question</label>
+              <select
+                id="securityQuestion"
+                [(ngModel)]="securityQuestion"
+                name="securityQuestion"
+                required
+              >
+                @for (q of securityQuestions; track q) {
+                  <option [value]="q">{{ q }}</option>
+                }
+              </select>
+              @if (errors['securityQuestion']) {
+                <span class="error-text">{{ errors['securityQuestion'] }}</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="securityAnswer">Security Answer</label>
+              <input
+                type="text"
+                id="securityAnswer"
+                [(ngModel)]="securityAnswer"
+                name="securityAnswer"
+                placeholder="Your answer (used for password recovery)"
+                required
+              />
+              @if (errors['securityAnswer']) {
+                <span class="error-text">{{ errors['securityAnswer'] }}</span>
+              }
+            </div>
+
             <label class="checkbox-label terms-label">
               <input type="checkbox" [(ngModel)]="agreeTerms" name="agreeTerms" />
               <span>I agree to the <a href="#" class="terms-link">Terms & Conditions</a></span>
@@ -191,6 +223,8 @@ import { ToastService } from '../../services/toast.service';
       border-radius: var(--radius-xl);
       padding: 2.5rem;
       animation: scaleIn 0.4s ease forwards;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     .auth-title { font-size: var(--font-size-2xl); font-weight: 700; margin-bottom: 0.3rem; }
@@ -260,9 +294,20 @@ export class RegisterComponent {
   email = '';
   password = '';
   confirmPassword = '';
+  securityQuestion = 'What was the name of your first pet?';
+  securityAnswer = '';
   agreeTerms = false;
   isLoading = false;
   errors: Record<string, string> = {};
+
+  securityQuestions = [
+    'What was the name of your first pet?',
+    'What city were you born in?',
+    'What is your mother\'s maiden name?',
+    'What was the name of your first school?',
+    'What is the name of your childhood best friend?',
+    'What street did you grow up on?'
+  ];
 
   async onRegister(): Promise<void> {
     this.errors = {};
@@ -271,6 +316,7 @@ export class RegisterComponent {
     if (!this.email.trim()) this.errors['email'] = 'Email is required';
     if (!this.password || this.password.length < 6) this.errors['password'] = 'Password must be at least 6 characters';
     if (this.password !== this.confirmPassword) this.errors['confirmPassword'] = 'Passwords do not match';
+    if (!this.securityAnswer.trim()) this.errors['securityAnswer'] = 'Security answer is required';
 
     if (Object.keys(this.errors).length > 0) {
       this.toastService.error('Please fix the errors above');
@@ -283,14 +329,14 @@ export class RegisterComponent {
     }
 
     this.isLoading = true;
-    const success = await this.authService.register(this.fullName, this.email, this.password);
+    const success = await this.authService.register(
+      this.fullName, this.email, this.password,
+      this.securityQuestion, this.securityAnswer
+    );
     this.isLoading = false;
 
     if (success) {
-      this.toastService.success('Account created successfully! Welcome to FitLife 🎉');
       this.router.navigate(['/dashboard']);
-    } else {
-      this.toastService.error('Registration failed. Email may already be in use.');
     }
   }
 }

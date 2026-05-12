@@ -1,10 +1,39 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { forkJoin } from 'rxjs';
 import { BaseChartDirective } from 'ng2-charts';
 import { ChartConfiguration } from 'chart.js';
 import { WorkoutService } from '../../services/workout.service';
 import { NutritionService } from '../../services/nutrition.service';
+import { WaterService } from '../../services/water.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
+
+interface WorkoutDaySummary {
+  date: string;
+  label: string;
+  count: number;
+  totalCalories: number;
+  types: string;
+}
+
+interface MealDaySummary {
+  date: string;
+  label: string;
+  count: number;
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+}
+
+interface WaterDaySummary {
+  date: string;
+  label: string;
+  count: number;
+  totalMl: number;
+}
 
 @Component({
   selector: 'app-history',
@@ -16,12 +45,16 @@ import { NutritionService } from '../../services/nutrition.service';
 export class HistoryComponent implements OnInit {
   private workoutService = inject(WorkoutService);
   private nutritionService = inject(NutritionService);
+  private waterService = inject(WaterService);
+  private http = inject(HttpClient);
 
-  activeTab: 'workouts' | 'meals' = 'workouts';
-  startDate = '';
-  endDate = '';
-  filteredWorkouts: any[] = [];
-  filteredMeals: any[] = [];
+  activeTab: 'workouts' | 'meals' | 'water' = 'workouts';
+  period: 'week' | 'month' = 'week';
+
+  // Aggregated daily summaries
+  workoutSummaries: WorkoutDaySummary[] = [];
+  mealSummaries: MealDaySummary[] = [];
+  waterSummaries: WaterDaySummary[] = [];
 
   // Chart configs
   lineChartData: ChartConfiguration<'line'>['data'] = { labels: [], datasets: [] };
@@ -51,53 +84,134 @@ export class HistoryComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    this.loadData();
+  }
+
+  get dateRange(): { start: string; end: string } {
     const now = new Date();
-    this.endDate = now.toISOString().split('T')[0];
-    const start = new Date(); start.setDate(start.getDate() - 30);
-    this.startDate = start.toISOString().split('T')[0];
-    // Load data from backend
-    this.workoutService.loadWorkouts();
-    this.nutritionService.loadMeals();
-    // Delay to allow signals to update from API
-    setTimeout(() => this.loadData(), 500);
+    const end = now.toISOString().split('T')[0];
+    const startDate = new Date();
+    if (this.period === 'week') {
+      startDate.setDate(startDate.getDate() - 6);
+    } else {
+      startDate.setDate(startDate.getDate() - 29);
+    }
+    return { start: startDate.toISOString().split('T')[0], end };
+  }
+
+  onPeriodChange(): void {
+    this.loadData();
   }
 
   loadData(): void {
-    this.filteredWorkouts = this.workoutService.getWorkoutsByDateRange(this.startDate, this.endDate);
-    this.filteredMeals = this.nutritionService.getMealsByDateRange(this.startDate, this.endDate);
-    this.buildCharts();
+    const { start, end } = this.dateRange;
+    const apiUrl = environment.apiUrl;
+
+    // Load all three in parallel and build summaries when ALL complete
+    forkJoin({
+      workouts: this.http.get<any[]>(`${apiUrl}/workouts/history`, { params: { start, end } }),
+      meals: this.http.get<any[]>(`${apiUrl}/meals/history`, { params: { start, end } }),
+      water: this.http.get<any[]>(`${apiUrl}/water/history`, { params: { start, end } })
+    }).subscribe({
+      next: ({ workouts, meals, water }) => {
+        this.workoutService.historyWorkouts.set(workouts);
+        this.nutritionService.historyMeals.set(meals);
+        this.waterService.historyLogs.set(water);
+        this.buildSummaries();
+      },
+      error: () => {} // individual service toasts handle errors
+    });
   }
 
-  onFilterChange(): void { this.loadData(); }
+  private buildSummaries(): void {
+    const { start, end } = this.dateRange;
+    const days = this.getDaysInRange(start, end);
 
-  private buildCharts(): void {
-    // Line: Calories over time (last 7 days)
-    const days: string[] = [];
-    const cals: number[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const ds = d.toISOString().split('T')[0];
-      days.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
-      const dayMeals = this.nutritionService.meals().filter(m => m.date.split('T')[0] === ds);
-      cals.push(dayMeals.reduce((s, m) => s + m.calories, 0));
-    }
+    // Workout daily summaries
+    const workouts = this.workoutService.historyWorkouts();
+    this.workoutSummaries = days.map(day => {
+      const dayWorkouts = workouts.filter(w => w.date?.split('T')[0] === day.date);
+      return {
+        date: day.date,
+        label: day.label,
+        count: dayWorkouts.length,
+        totalCalories: dayWorkouts.reduce((s, w) => s + (w.caloriesBurned ?? 0), 0),
+        types: [...new Set(dayWorkouts.map(w => w.exerciseType))].join(', ') || '-'
+      };
+    }).filter(s => s.count > 0);
+
+    // Meal daily summaries
+    const meals = this.nutritionService.historyMeals();
+    this.mealSummaries = days.map(day => {
+      const dayMeals = meals.filter(m => m.date?.split('T')[0] === day.date);
+      return {
+        date: day.date,
+        label: day.label,
+        count: dayMeals.length,
+        totalCalories: dayMeals.reduce((s, m) => s + m.calories, 0),
+        totalProtein: Math.round(dayMeals.reduce((s, m) => s + m.protein, 0)),
+        totalCarbs: Math.round(dayMeals.reduce((s, m) => s + m.carbs, 0)),
+        totalFat: Math.round(dayMeals.reduce((s, m) => s + m.fat, 0))
+      };
+    }).filter(s => s.count > 0);
+
+    // Water daily summaries
+    const waterLogs = this.waterService.historyLogs();
+    this.waterSummaries = days.map(day => {
+      const dayLogs = waterLogs.filter(l => l.date === day.date);
+      return {
+        date: day.date,
+        label: day.label,
+        count: dayLogs.length,
+        totalMl: dayLogs.reduce((s, l) => s + l.amountMl, 0)
+      };
+    }).filter(s => s.count > 0);
+
+    this.buildCharts(days, workouts, meals, waterLogs);
+  }
+
+  private buildCharts(days: { date: string; label: string }[], workouts: any[], meals: any[], waterLogs: any[]): void {
+    // Line: Calories intake over time
+    const calLabels = days.map(d => d.label);
+    const calData = days.map(d => {
+      return meals.filter(m => m.date?.split('T')[0] === d.date).reduce((s: number, m: any) => s + m.calories, 0);
+    });
     this.lineChartData = {
-      labels: days,
-      datasets: [{ data: cals, label: 'Calories Intake', borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: true, tension: 0.4 }]
+      labels: calLabels,
+      datasets: [{ data: calData, label: 'Calories Intake', borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: true, tension: 0.4 }]
     };
 
     // Bar: Workout sessions per day
-    const weekly = this.workoutService.getWeeklyWorkoutCounts();
+    const workoutCounts = days.map(d => workouts.filter(w => w.date?.split('T')[0] === d.date).length);
     this.barChartData = {
-      labels: weekly.map(w => w.label),
-      datasets: [{ data: weekly.map(w => w.count), label: 'Workouts', backgroundColor: '#4ade80', borderRadius: 6 }]
+      labels: calLabels,
+      datasets: [{ data: workoutCounts, label: 'Workouts', backgroundColor: '#4ade80', borderRadius: 6 }]
     };
 
-    // Pie: Macro breakdown
-    const totals = this.nutritionService.getTodayTotals();
+    // Pie: Total macro breakdown for the period
+    const totalProtein = meals.reduce((s: number, m: any) => s + m.protein, 0);
+    const totalCarbs = meals.reduce((s: number, m: any) => s + m.carbs, 0);
+    const totalFat = meals.reduce((s: number, m: any) => s + m.fat, 0);
+    const hasMacroData = totalProtein > 0 || totalCarbs > 0 || totalFat > 0;
     this.pieChartData = {
       labels: ['Protein', 'Carbs', 'Fat'],
-      datasets: [{ data: [totals.protein || 40, totals.carbs || 50, totals.fat || 20], backgroundColor: ['#4ade80', '#60a5fa', '#facc15'] }]
+      datasets: [{
+        data: hasMacroData ? [Math.round(totalProtein), Math.round(totalCarbs), Math.round(totalFat)] : [0, 0, 0],
+        backgroundColor: ['#4ade80', '#60a5fa', '#facc15']
+      }]
     };
+  }
+
+  private getDaysInRange(start: string, end: string): { date: string; label: string }[] {
+    const result: { date: string; label: string }[] = [];
+    const current = new Date(start);
+    const endDate = new Date(end);
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0];
+      const label = current.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      result.push({ date: dateStr, label });
+      current.setDate(current.getDate() + 1);
+    }
+    return result;
   }
 }

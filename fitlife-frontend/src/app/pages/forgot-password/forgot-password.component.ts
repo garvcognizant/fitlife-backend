@@ -1,5 +1,5 @@
 import { Component, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -19,10 +19,10 @@ import { ToastService } from '../../services/toast.service';
       </div>
       <div class="auth-right">
         <div class="auth-card">
-          @if (!resetToken) {
+          @if (step === 1) {
             <h2 class="auth-title">Forgot Password 🔐</h2>
-            <p class="auth-subtitle">Enter your email to receive a reset token</p>
-            <form (ngSubmit)="onSubmit()" class="auth-form">
+            <p class="auth-subtitle">Enter your email to verify your identity</p>
+            <form (ngSubmit)="onSubmitEmail()" class="auth-form">
               <div class="form-group">
                 <label>Email Address</label>
                 <input type="email" [(ngModel)]="email" name="email" placeholder="Enter your email" required />
@@ -30,21 +30,49 @@ import { ToastService } from '../../services/toast.service';
               @if (errorMsg) { <div class="error-banner">{{ errorMsg }}</div> }
               <button type="submit" class="btn btn-primary auth-submit" [disabled]="isLoading">
                 @if (isLoading) { <span class="spinner"></span> }
-                Send Reset Token
+                Continue
               </button>
             </form>
-          } @else {
-            <div class="success-box">
-              <span class="success-icon">✅</span>
-              <h3>Reset token generated!</h3>
-              <p>Copy this token and use it on the reset password page:</p>
-              <div class="token-box">{{ resetToken }}</div>
-              <button class="btn btn-secondary copy-btn" (click)="copyToken()">Copy Token</button>
-            </div>
-            <a routerLink="/reset-password" class="btn btn-primary" style="width:100%;text-align:center;margin-top:1rem;display:block">
-              Go to Reset Password →
-            </a>
           }
+
+          @if (step === 2) {
+            <h2 class="auth-title">Security Question 🔒</h2>
+            <p class="auth-subtitle">{{ securityQuestion }}</p>
+            <form (ngSubmit)="onSubmitAnswer()" class="auth-form">
+              <div class="form-group">
+                <label>Your Answer</label>
+                <input type="text" [(ngModel)]="securityAnswer" name="answer" placeholder="Enter your answer" required />
+              </div>
+              <div class="form-group">
+                <label>New Password</label>
+                <input type="password" [(ngModel)]="newPassword" name="newPassword" placeholder="At least 6 characters" required minlength="6" />
+              </div>
+              <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" placeholder="Repeat new password" required />
+              </div>
+              @if (errorMsg) { <div class="error-banner">{{ errorMsg }}</div> }
+              <button type="submit" class="btn btn-primary auth-submit" [disabled]="isLoading">
+                @if (isLoading) { <span class="spinner"></span> }
+                Reset Password
+              </button>
+              <button type="button" class="btn btn-secondary" style="width:100%" (click)="step = 1; errorMsg = ''">
+                ← Back
+              </button>
+            </form>
+          }
+
+          @if (step === 3) {
+            <div class="success-box">
+              <span class="success-icon">🎉</span>
+              <h3>Password reset successfully!</h3>
+              <p>You can now sign in with your new password.</p>
+              <a routerLink="/login" class="btn btn-primary" style="display:block;text-align:center;margin-top:1rem">
+                Go to Login →
+              </a>
+            </div>
+          }
+
           <p class="auth-switch">
             Remembered it? <a routerLink="/login" class="switch-link">Sign in</a>
           </p>
@@ -72,11 +100,7 @@ import { ToastService } from '../../services/toast.service';
     .success-box { text-align:center; padding:1rem 0; }
     .success-icon { font-size:3rem; display:block; margin-bottom:0.75rem; }
     .success-box h3 { font-weight:700; margin-bottom:0.5rem; }
-    .success-box p { color:var(--text-secondary); font-size:var(--font-size-sm); margin-bottom:1rem; }
-    .token-box { background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-md);
-      padding:0.75rem 1rem; font-family:monospace; font-size:0.75rem; word-break:break-all;
-      color:var(--green-primary); margin-bottom:0.75rem; }
-    .copy-btn { width:100%; justify-content:center; }
+    .success-box p { color:var(--text-secondary); font-size:var(--font-size-sm); }
     .spinner { width:18px; height:18px; border:2px solid transparent; border-top-color:#000;
       border-radius:50%; animation:spin 0.6s linear infinite; }
     .auth-switch { text-align:center; margin-top:1.5rem; font-size:var(--font-size-sm); color:var(--text-secondary); }
@@ -88,18 +112,22 @@ export class ForgotPasswordComponent {
   private authService = inject(AuthService);
   private toast = inject(ToastService);
 
+  step = 1; // 1=email, 2=answer+new password, 3=success
   email = '';
+  securityQuestion = '';
+  securityAnswer = '';
+  newPassword = '';
+  confirmPassword = '';
   isLoading = false;
   errorMsg = '';
-  resetToken = '';
 
-  async onSubmit(): Promise<void> {
+  async onSubmitEmail(): Promise<void> {
     if (!this.email.trim()) { this.errorMsg = 'Email is required'; return; }
     this.errorMsg = '';
     this.isLoading = true;
     try {
-      this.resetToken = await this.authService.forgotPassword(this.email);
-      this.toast.success('Reset token generated. Copy and use it below.');
+      this.securityQuestion = await this.authService.getSecurityQuestion(this.email);
+      this.step = 2;
     } catch (err: any) {
       this.errorMsg = typeof err === 'string' ? err : 'No account found with this email';
     } finally {
@@ -107,10 +135,21 @@ export class ForgotPasswordComponent {
     }
   }
 
-  copyToken(): void {
-    navigator.clipboard.writeText(this.resetToken).then(() => {
-      this.toast.success('Token copied to clipboard');
-    });
+  async onSubmitAnswer(): Promise<void> {
+    this.errorMsg = '';
+    if (!this.securityAnswer.trim()) { this.errorMsg = 'Answer is required'; return; }
+    if (this.newPassword.length < 6) { this.errorMsg = 'Password must be at least 6 characters'; return; }
+    if (this.newPassword !== this.confirmPassword) { this.errorMsg = 'Passwords do not match'; return; }
+
+    this.isLoading = true;
+    try {
+      await this.authService.resetPassword(this.email, this.securityAnswer, this.newPassword);
+      this.step = 3;
+      this.toast.success('Password reset successfully! 🎉');
+    } catch (err: any) {
+      this.errorMsg = typeof err === 'string' ? err : 'Security answer is incorrect';
+    } finally {
+      this.isLoading = false;
+    }
   }
 }
-

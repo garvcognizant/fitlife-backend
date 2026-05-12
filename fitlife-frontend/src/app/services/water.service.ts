@@ -13,7 +13,10 @@ export interface WaterLog {
 
 @Injectable({ providedIn: 'root' })
 export class WaterService {
+  /** Today's water logs only - resets each day */
   logs = signal<WaterLog[]>([]);
+  /** Historical water logs for history page */
+  historyLogs = signal<WaterLog[]>([]);
   private apiUrl = `${environment.apiUrl}/water`;
   private authService = inject(AuthService);
   private calc = inject(FitnessCalculatorService);
@@ -26,15 +29,11 @@ export class WaterService {
   }
 
   get todayTotalMl(): number {
-    const today = new Date().toISOString().split('T')[0];
-    return this.logs()
-      .filter(l => l.date === today)
-      .reduce((s, l) => s + l.amountMl, 0);
+    return this.logs().reduce((s, l) => s + l.amountMl, 0);
   }
 
   get todayLogs(): WaterLog[] {
-    const today = new Date().toISOString().split('T')[0];
-    return this.logs().filter(l => l.date === today);
+    return this.logs();
   }
 
   get progressPct(): number {
@@ -47,6 +46,14 @@ export class WaterService {
     this.http.get<WaterLog[]>(this.apiUrl).subscribe({
       next: (data) => this.logs.set(data),
       error: (err) => this.toast.error(err.error?.error || 'Failed to load water logs')
+    });
+  }
+
+  /** Load water logs for a date range (for history page) */
+  loadHistory(start: string, end: string): void {
+    this.http.get<WaterLog[]>(`${this.apiUrl}/history`, { params: { start, end } }).subscribe({
+      next: (data) => this.historyLogs.set(data),
+      error: (err) => this.toast.error(err.error?.error || 'Failed to load water history')
     });
   }
 
@@ -72,4 +79,3 @@ export class WaterService {
     });
   }
 }
-

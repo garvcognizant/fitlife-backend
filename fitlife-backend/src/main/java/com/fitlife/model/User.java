@@ -28,6 +28,9 @@ public class User {
     private String fitnessGoal;
     private String avatarUrl;
 
+    private String securityQuestion;
+    private String securityAnswer;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -124,6 +124,14 @@
             <textarea id="notes" [(ngModel)]="form.notes" name="notes" placeholder="How did it feel? Any observations?"></textarea>
           </div>
 
+          <div class="form-group">
+            <label for="calories">Calories Burned <span class="required-mark">*</span></label>
+            <input type="number" id="calories" [(ngModel)]="form.caloriesBurned" name="caloriesBurned" min="1"
+                   placeholder="Enter from your fitness device" required />
+            <span class="field-hint">Enter the actual value from your fitness tracker / smartwatch</span>
+            @if (errors['calories']) { <span class="error-text">{{ errors['calories'] }}</span> }
+          </div>
+
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
             <button type="submit" class="btn btn-primary" id="btn-save-workout">Save Workout</button>

@@ -92,8 +92,13 @@
 
         <form (ngSubmit)="saveMeal()" class="modal-form">
           <div class="form-group search-group">
-            <label>Food Item</label>
-            <input type="text" [(ngModel)]="searchQuery" name="search" placeholder="Search food..." (input)="onSearch()" autocomplete="off" />
+            <label>
+              Food Item
+              @if (isCustomEntry) { <span class="custom-badge">Custom</span> }
+            </label>
+            <input type="text" [(ngModel)]="searchQuery" name="search"
+                   placeholder="Search food or type a custom name..."
+                   (input)="onSearch()" autocomplete="off" />
             @if (searchResults.length > 0) {
               <div class="search-dropdown">
                 @for (r of searchResults; track r.name) {
@@ -103,6 +108,9 @@
                   </button>
                 }
               </div>
+            }
+            @if (isCustomEntry) {
+              <p class="custom-hint">✏️ Custom food — enter macros manually below</p>
             }
           </div>
 
@@ -119,15 +127,32 @@
               <input type="number" [(ngModel)]="form.quantity" name="qty" (change)="onQuantityChange()" min="1" />
             </div>
             <div class="form-group">
-              <label>Calories</label>
-              <input type="number" [(ngModel)]="form.calories" name="cal" />
+              <label>Unit</label>
+              <select [(ngModel)]="form.unit" name="unit">
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="oz">oz</option>
+                <option value="cup">cup</option>
+                <option value="piece">piece</option>
+                <option value="serving">serving</option>
+              </select>
             </div>
           </div>
 
-          <div class="form-row three-col">
-            <div class="form-group"><label>Protein (g)</label><input type="number" [(ngModel)]="form.protein" name="protein" /></div>
-            <div class="form-group"><label>Carbs (g)</label><input type="number" [(ngModel)]="form.carbs" name="carbs" /></div>
-            <div class="form-group"><label>Fat (g)</label><input type="number" [(ngModel)]="form.fat" name="fat" /></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Calories (kcal)</label>
+              <input type="number" [(ngModel)]="form.calories" name="cal" min="0" (input)="onMacrosManualEdit()" />
+            </div>
+            <div class="form-group">
+              <label>Protein (g)</label>
+              <input type="number" [(ngModel)]="form.protein" name="protein" min="0" (input)="onMacrosManualEdit()" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group"><label>Carbs (g)</label><input type="number" [(ngModel)]="form.carbs" name="carbs" min="0" (input)="onMacrosManualEdit()" /></div>
+            <div class="form-group"><label>Fat (g)</label><input type="number" [(ngModel)]="form.fat" name="fat" min="0" (input)="onMacrosManualEdit()" /></div>
           </div>
 
           <div class="modal-actions">

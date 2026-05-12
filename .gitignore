@@ -21,3 +21,21 @@ target/
 *.sw?
 .DS_Store
 Thumbs.db
+
+# Environment / Secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# Package lock (optional - uncomment if you want to commit it)
+# package-lock.json
+
+# OS files
+desktop.ini
+ehthumbs.db

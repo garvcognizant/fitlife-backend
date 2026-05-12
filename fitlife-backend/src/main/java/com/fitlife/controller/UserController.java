@@ -6,6 +6,7 @@ import com.fitlife.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -21,6 +22,7 @@ public class UserController {
     }
 
     @PutMapping("/profile")
+    @Transactional
     public ResponseEntity<UserDto> updateProfile(@AuthenticationPrincipal User user,
                                                   @RequestBody UserDto dto) {
         if (dto.getFullName() != null) user.setFullName(dto.getFullName());

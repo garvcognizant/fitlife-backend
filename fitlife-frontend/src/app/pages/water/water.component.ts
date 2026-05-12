@@ -122,9 +122,16 @@ import { ProgressRingComponent } from '../../shared/progress-ring/progress-ring.
     .quick-amount { font-size: var(--font-size-base); font-weight: 700; color: #3b82f6; }
     .quick-label { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-    .custom-add label { display: block; font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 0.4rem; }
-    .custom-row { display: flex; gap: 0.75rem; }
-    .custom-row input { flex: 1; }
+    .custom-add label { display: block; font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 0.5rem; font-weight: 600; }
+    .custom-row { display: flex; gap: 0.75rem; align-items: center; }
+    .custom-row input {
+      flex: 1; padding: 0.65rem 0.9rem; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+      border-radius: var(--radius-md); color: var(--text-primary); font-size: var(--font-size-base);
+      outline: none; transition: border-color 0.2s;
+      &:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+      &::placeholder { color: var(--text-muted); }
+    }
+    .custom-row .btn { white-space: nowrap; padding: 0.65rem 1.2rem; }
 
     .log-card { padding: 1.5rem; }
     .empty-log { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem; color: var(--text-muted); }

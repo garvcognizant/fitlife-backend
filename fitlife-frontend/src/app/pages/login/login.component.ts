@@ -66,7 +66,7 @@ import { ToastService } from '../../services/toast.service';
                 <input type="checkbox" [(ngModel)]="rememberMe" name="remember" />
                 <span>Remember me</span>
               </label>
-              <a href="#" class="forgot-link">Forgot password?</a>
+              <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
             </div>
 
             <button type="submit" class="btn btn-primary auth-submit" id="btn-login" [disabled]="isLoading">
@@ -305,10 +305,7 @@ export class LoginComponent {
     this.isLoading = false;
 
     if (success) {
-      this.toastService.success('Welcome back! Let\'s crush those goals 💪');
       this.router.navigate(['/dashboard']);
-    } else {
-      this.toastService.error('Invalid email or password');
     }
   }
 }

@@ -1,17 +1,47 @@
 .goals-page { animation: fadeIn 0.3s ease; }
 
-.page-header {
-  display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem;
-}
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
 .page-title { font-size: var(--font-size-2xl); font-weight: 700; margin-bottom: 0.3rem; }
 .page-subtitle { color: var(--text-secondary); font-size: var(--font-size-base); }
+.header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-.overall-card {
-  display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.5rem;
-  padding: 1.5rem; animation: fadeInUp 0.4s ease;
+/* Weight Summary */
+.weight-summary {
+  display: flex; align-items: center; gap: 2rem; margin-bottom: 1.5rem; padding: 1.5rem; flex-wrap: wrap;
 }
-.overall-info h3 { font-size: var(--font-size-lg); font-weight: 700; }
-.overall-info p { color: var(--text-secondary); font-size: var(--font-size-base); margin-top: 0.3rem; }
+.weight-current { display: flex; flex-direction: column; }
+.weight-label { font-size: var(--font-size-xs); color: var(--text-muted); }
+.weight-value { font-size: var(--font-size-2xl); font-weight: 800; color: var(--green-primary); }
+.weight-change {
+  display: flex; align-items: center; gap: 0.3rem; font-size: var(--font-size-sm); font-weight: 600;
+  &.loss { color: #4ade80; }
+  &.gain { color: #f97316; }
+  .material-icons-round { font-size: 18px; }
+}
+.weight-entries { font-size: var(--font-size-xs); color: var(--text-muted); }
+
+.weight-prompt {
+  display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding: 1.5rem; flex-wrap: wrap;
+  strong { font-size: var(--font-size-base); }
+  p { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 0.2rem; }
+}
+.prompt-icon { font-size: 2.5rem; }
+
+.weight-goal-note {
+  display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs);
+  color: var(--text-muted); margin: 0.75rem 0 0.5rem;
+  .material-icons-round { font-size: 14px; }
+}
+.btn-block { width: 100%; justify-content: center; }
+
+.form-hint {
+  font-size: var(--font-size-xs); color: #fbbf24; background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.2); border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem; margin-bottom: 1rem;
+}
+
+.weight-input { font-size: var(--font-size-2xl); font-weight: 700; text-align: center; }
+.modal-sm { max-width: 380px; }
 
 .section-title { font-size: var(--font-size-lg); font-weight: 700; margin-bottom: 1rem; }
 .completed-title { margin-top: 2rem; }

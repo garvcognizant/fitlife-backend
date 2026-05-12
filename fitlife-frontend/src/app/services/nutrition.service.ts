@@ -1,6 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { ToastService } from './toast.service';
+import { AuthService } from './auth.service';
+import { FitnessCalculatorService } from './fitness-calculator.service';
 
 export interface Meal {
   id: number;
@@ -25,12 +28,19 @@ export interface FoodItem {
 
 @Injectable({ providedIn: 'root' })
 export class NutritionService {
+  /** Today's meals only - resets each day */
   meals = signal<Meal[]>([]);
+  /** Historical meals for history page */
+  historyMeals = signal<Meal[]>([]);
   private apiUrl = `${environment.apiUrl}/meals`;
 
-  dailyGoals = signal({ calories: 2500, protein: 150, carbs: 300, fat: 85 });
+  dailyGoals = signal({ calories: 2000, protein: 130, carbs: 250, fat: 65 });
 
-  foodDatabase: FoodItem[] = [
+  private authService = inject(AuthService);
+  private calc = inject(FitnessCalculatorService);
+
+  /** Common food lookup - convenience only, users can always enter custom foods with their own macros */
+  readonly foodDatabase: FoodItem[] = [
     { name: 'Chicken Breast', caloriesPer100g: 165, proteinPer100g: 31, carbsPer100g: 0, fatPer100g: 3.6 },
     { name: 'Brown Rice', caloriesPer100g: 112, proteinPer100g: 2.6, carbsPer100g: 24, fatPer100g: 0.9 },
     { name: 'Eggs', caloriesPer100g: 155, proteinPer100g: 13, carbsPer100g: 1.1, fatPer100g: 11 },
@@ -53,11 +63,37 @@ export class NutritionService {
     { name: 'Steak (Beef)', caloriesPer100g: 271, proteinPer100g: 26, carbsPer100g: 0, fatPer100g: 18 },
   ];
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private toast: ToastService) {
+    effect(() => {
+      const user = this.authService.currentUser();
+      if (user && user.weightKg && user.heightCm && user.age) {
+        const macros = this.calc.calcMacros(user);
+        this.dailyGoals.set({
+          calories: this.calc.calcCaloricTarget(user),
+          protein: macros.protein,
+          carbs: macros.carbs,
+          fat: macros.fat
+        });
+      }
+    });
+  }
 
+  /** Loads today's meals only (daily reset) */
   loadMeals(): void {
     this.http.get<Meal[]>(this.apiUrl).subscribe({
-      next: (data) => this.meals.set(data)
+      next: (data) => this.meals.set(data),
+      error: (err) => {
+        const message = err.error?.error || 'Failed to load meals';
+        this.toast.error(message);
+      }
+    });
+  }
+
+  /** Load meals for a date range (for history page) */
+  loadHistory(start: string, end: string): void {
+    this.http.get<Meal[]>(`${this.apiUrl}/history`, { params: { start, end } }).subscribe({
+      next: (data) => this.historyMeals.set(data),
+      error: (err) => this.toast.error(err.error?.error || 'Failed to load meal history')
     });
   }
 
@@ -70,24 +106,34 @@ export class NutritionService {
     return new Promise((resolve, reject) => {
       this.http.post<Meal>(this.apiUrl, meal).subscribe({
         next: (m) => { this.meals.update(list => [m, ...list]); resolve(m); },
-        error: reject
+        error: (err) => { this.toast.error(err.error?.error || 'Failed to add meal'); reject(err); }
+      });
+    });
+  }
+
+  updateMeal(id: number, updates: Partial<Meal>): Promise<Meal> {
+    return new Promise((resolve, reject) => {
+      this.http.put<Meal>(`${this.apiUrl}/${id}`, updates).subscribe({
+        next: (m) => { this.meals.update(list => list.map(x => x.id === id ? m : x)); resolve(m); },
+        error: (err) => { this.toast.error(err.error?.error || 'Failed to update meal'); reject(err); }
       });
     });
   }
 
   deleteMeal(id: number): void {
     this.http.delete(`${this.apiUrl}/${id}`).subscribe({
-      next: () => this.meals.update(list => list.filter(m => m.id !== id))
+      next: () => this.meals.update(list => list.filter(m => m.id !== id)),
+      error: (err) => this.toast.error(err.error?.error || 'Failed to delete meal')
     });
   }
 
+  /** Today's meals are already loaded via the default endpoint */
   getTodayMeals(): Meal[] {
-    const today = new Date().toISOString().split('T')[0];
-    return this.meals().filter(m => m.date?.split('T')[0] === today);
+    return this.meals();
   }
 
   getTodayTotals(): { calories: number; protein: number; carbs: number; fat: number } {
-    const today = this.getTodayMeals();
+    const today = this.meals();
     return {
       calories: Math.round(today.reduce((s, m) => s + m.calories, 0)),
       protein: Math.round(today.reduce((s, m) => s + m.protein, 0)),
@@ -98,20 +144,26 @@ export class NutritionService {
 
   getRemainingMacros(): { calories: number; protein: number; carbs: number; fat: number } {
     const t = this.getTodayTotals(); const g = this.dailyGoals();
-    return { calories: Math.max(0, g.calories - t.calories), protein: Math.max(0, g.protein - t.protein),
-      carbs: Math.max(0, g.carbs - t.carbs), fat: Math.max(0, g.fat - t.fat) };
+    return {
+      calories: Math.max(0, g.calories - t.calories),
+      protein: Math.max(0, g.protein - t.protein),
+      carbs: Math.max(0, g.carbs - t.carbs),
+      fat: Math.max(0, g.fat - t.fat)
+    };
   }
 
   getPercentages(): { calories: number; protein: number; carbs: number; fat: number } {
     const t = this.getTodayTotals(); const g = this.dailyGoals();
-    return { calories: Math.min(100, Math.round((t.calories / g.calories) * 100)),
-      protein: Math.min(100, Math.round((t.protein / g.protein) * 100)),
-      carbs: Math.min(100, Math.round((t.carbs / g.carbs) * 100)),
-      fat: Math.min(100, Math.round((t.fat / g.fat) * 100)) };
+    return {
+      calories: g.calories > 0 ? Math.min(100, Math.round((t.calories / g.calories) * 100)) : 0,
+      protein: g.protein > 0 ? Math.min(100, Math.round((t.protein / g.protein) * 100)) : 0,
+      carbs: g.carbs > 0 ? Math.min(100, Math.round((t.carbs / g.carbs) * 100)) : 0,
+      fat: g.fat > 0 ? Math.min(100, Math.round((t.fat / g.fat) * 100)) : 0
+    };
   }
 
   getMealsByDateRange(start: string, end: string): Meal[] {
-    return this.meals().filter(m => {
+    return this.historyMeals().filter(m => {
       const d = m.date?.split('T')[0];
       return d && d >= start && d <= end;
     });

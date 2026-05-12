@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -18,8 +19,21 @@ public class WorkoutController {
     private final WorkoutService workoutService;
 
     @GetMapping
-    public ResponseEntity<List<WorkoutDto>> getWorkouts(@AuthenticationPrincipal User user) {
+    public ResponseEntity<List<WorkoutDto>> getTodayWorkouts(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(workoutService.getTodayWorkouts(user.getId()));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<List<WorkoutDto>> getAllWorkouts(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(workoutService.getUserWorkouts(user.getId()));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<WorkoutDto>> getHistory(@AuthenticationPrincipal User user,
+                                                        @RequestParam String start,
+                                                        @RequestParam String end) {
+        return ResponseEntity.ok(workoutService.getWorkoutsByDateRange(
+                user.getId(), LocalDate.parse(start), LocalDate.parse(end)));
     }
 
     @PostMapping

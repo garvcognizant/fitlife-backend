@@ -1,5 +1,7 @@
 .workouts-page { animation: fadeIn 0.3s ease; }
 
+.field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 0.2rem; display: block; }
+
 .page-header {
   display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem;
 }

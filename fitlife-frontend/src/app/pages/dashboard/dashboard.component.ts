@@ -4,11 +4,16 @@ import { DecimalPipe } from '@angular/common';
 import { WorkoutService } from '../../services/workout.service';
 import { NutritionService } from '../../services/nutrition.service';
 import { GoalService } from '../../services/goal.service';
+import { WaterService } from '../../services/water.service';
+import { AuthService } from '../../services/auth.service';
+import { WeightLogService } from '../../services/weight-log.service';
+import { InsightsService } from '../../services/insights.service';
+import { InsightsPanelComponent } from '../../shared/insights-panel/insights-panel.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, InsightsPanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss'
 })
@@ -16,50 +21,108 @@ export class DashboardComponent implements OnInit {
   private workoutService = inject(WorkoutService);
   private nutritionService = inject(NutritionService);
   private goalService = inject(GoalService);
+  private waterService = inject(WaterService);
+  private weightLogService = inject(WeightLogService);
+  insightsService = inject(InsightsService);
+  authService = inject(AuthService);
   private router = inject(Router);
+
+  /** Profile completeness: needs height, weight, age for calculations to work */
+  profileComplete = computed(() => {
+    const u = this.authService.currentUser();
+    return !!(u && u.heightCm && u.weightKg && u.age);
+  });
 
   caloriesBurned = computed(() => this.workoutService.getTotalCaloriesBurned());
   workoutCount = computed(() => this.workoutService.getWorkoutCount());
-  goalProgress = computed(() => this.goalService.getOverallProgress() || 0);
-  weeklyStreak = 5;
+
+  /** REAL goal progress: based on weight logs toward weight goal, or goal service average */
+  goalProgress = computed(() => {
+    const goals = this.goalService.getActiveGoals();
+    const weightGoal = goals.find(g => g.type === 'weight');
+    if (weightGoal && this.weightLogService.logs().length >= 1) {
+      // Use real weight data
+      const start = weightGoal.currentValue || this.weightLogService.firstWeight || 0;
+      return this.weightLogService.getWeightGoalProgress(start, weightGoal.targetValue);
+    }
+    // Fallback: goal service average (for non-weight goals)
+    return this.goalService.getOverallProgress() || 0;
+  });
+
+  weeklyStreak = computed(() => {
+    let streak = 0;
+    const allWorkouts = [...this.workoutService.historyWorkouts(), ...this.workoutService.workouts()];
+    // Start from yesterday (today is still in progress)
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const hasWorkout = allWorkouts.some(w => w.date?.split('T')[0] === dateStr);
+      if (hasWorkout) streak++;
+      else break;
+    }
+    // If today also has a workout, count it too
+    const today = new Date().toISOString().split('T')[0];
+    if (this.workoutService.workouts().some(w => w.date?.split('T')[0] === today)) streak++;
+    return streak;
+  });
 
   todayCalories = computed(() => this.nutritionService.getTodayTotals().calories);
   todayProtein = computed(() => this.nutritionService.getTodayTotals().protein);
-  
   calorieGoal = computed(() => this.nutritionService.dailyGoals().calories);
   proteinGoal = computed(() => this.nutritionService.dailyGoals().protein);
 
   caloriesPct = computed(() => {
-    const cal = this.todayCalories();
     const goal = this.calorieGoal();
-    return goal > 0 ? Math.min(100, Math.round((cal / goal) * 100)) : 0;
+    return goal > 0 ? Math.min(100, Math.round((this.todayCalories() / goal) * 100)) : 0;
   });
-  
   proteinPct = computed(() => {
-    const pro = this.todayProtein();
     const goal = this.proteinGoal();
-    return goal > 0 ? Math.min(100, Math.round((pro / goal) * 100)) : 0;
+    return goal > 0 ? Math.min(100, Math.round((this.todayProtein() / goal) * 100)) : 0;
   });
 
+  hydrationPct = computed(() => this.waterService.progressPct);
+  hydrationMl = computed(() => this.waterService.todayTotalMl);
+  hydrationGoal = computed(() => this.waterService.dailyGoalMl);
+
+  latestWeight = computed(() => this.weightLogService.latestWeight);
+  weightChange = computed(() => this.weightLogService.weightChange);
+
   recentItems = computed(() => {
-    const workouts = this.workoutService.workouts().slice(0, 3).map(w => ({
-      id: w.id, type: 'workout', name: w.exerciseName,
-      detail: `${w.exerciseType} • ${w.caloriesBurned} cal`,
-      time: this.timeAgo(w.date)
+    const workouts = this.workoutService.getTodayWorkouts().slice(0, 3).map(w => ({
+      id: `w-${w.id}`, type: 'workout', name: w.exerciseName,
+      detail: `${w.exerciseType} • ${w.caloriesBurned ?? 0} cal`,
+      time: this.timeAgo(w.date),
+      sortKey: new Date(w.date).getTime()
     }));
-    const meals = this.nutritionService.meals().slice(0, 3).map(m => ({
-      id: m.id + 10000, type: 'meal', name: m.foodName,
+    const meals = this.nutritionService.getTodayMeals().slice(0, 3).map(m => ({
+      id: `m-${m.id}`, type: 'meal', name: m.foodName,
       detail: `${m.mealType} • ${m.calories} cal`,
-      time: this.timeAgo(m.date)
+      time: this.timeAgo(m.date),
+      sortKey: new Date(m.date).getTime()
     }));
-    return [...workouts, ...meals].sort((a, b) => b.id - a.id).slice(0, 5);
+    return [...workouts, ...meals].sort((a, b) => b.sortKey - a.sortKey).slice(0, 5);
   });
 
   ngOnInit(): void {
-    // Load data from backend
     this.workoutService.loadWorkouts();
     this.nutritionService.loadMeals();
     this.goalService.loadGoals();
+    this.waterService.loadTodayLogs();
+    this.weightLogService.loadHistory();
+
+    // Load 30 days of history for insights + streak
+    const today = new Date();
+    const monthAgo = new Date();
+    monthAgo.setDate(today.getDate() - 30);
+    const startStr = monthAgo.toISOString().split('T')[0];
+    const endStr = today.toISOString().split('T')[0];
+
+    this.workoutService.loadHistory(startStr, endStr);
+    this.nutritionService.loadHistory(startStr, endStr);
+    this.waterService.loadHistory(startStr, endStr);
+
+    // Generate insights after a brief delay for data to load
+    setTimeout(() => this.insightsService.generateInsights(), 1500);
   }
 
   navigate(path: string): void { this.router.navigate([path]); }

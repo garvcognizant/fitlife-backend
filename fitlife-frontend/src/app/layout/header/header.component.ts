@@ -11,12 +11,6 @@ import { AuthService } from '../../services/auth.service';
         <span class="greeting-text">{{ greeting }}</span>
       </div>
       <div class="header-actions">
-        <button class="header-icon-btn" id="btn-search" title="Search">
-          <span class="material-icons-round">search</span>
-        </button>
-        <button class="header-icon-btn" id="btn-notifications" title="Notifications">
-          <span class="material-icons-round">notifications_none</span>
-        </button>
         <button class="avatar-btn" id="btn-avatar" (click)="goToProfile()" title="Profile">
           <span class="avatar-initials">{{ authService.getInitials() }}</span>
         </button>
@@ -49,27 +43,6 @@ import { AuthService } from '../../services/auth.service';
       gap: 0.5rem;
     }
 
-    .header-icon-btn {
-      width: 38px;
-      height: 38px;
-      border-radius: var(--radius-full);
-      background: var(--bg-card);
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all var(--transition-fast);
-      border: 1px solid var(--border-color);
-
-      .material-icons-round { font-size: 20px; }
-
-      &:hover {
-        background: var(--bg-card-hover);
-        color: var(--text-primary);
-        border-color: var(--green-primary);
-      }
-    }
-
     .avatar-btn {
       width: 38px;
       height: 38px;
@@ -97,9 +70,11 @@ export class HeaderComponent {
 
   get greeting(): string {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning! Ready to get stronger? 🔥';
-    if (hour < 17) return "Good afternoon! Let's crush those goals! 💪";
-    return "Good evening! Time to wind down or work out? 🌙";
+    const name = this.authService.currentUser()?.fullName?.split(' ')[0] || '';
+    const nameStr = name ? `, ${name}` : '';
+    if (hour < 12) return `Good morning${nameStr}! Ready to get stronger? 🔥`;
+    if (hour < 17) return `Good afternoon${nameStr}! Let's crush those goals! 💪`;
+    return `Good evening${nameStr}! Time to wind down or work out? 🌙`;
   }
 
   goToProfile(): void {

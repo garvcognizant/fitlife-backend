@@ -1,4 +1,4 @@
-# FitLife — Personal Fitness Tracker
+npm # FitLife — Personal Fitness Tracker
 
 A full-stack fitness tracking application built with **Angular 19** and **Spring Boot 3**.
 

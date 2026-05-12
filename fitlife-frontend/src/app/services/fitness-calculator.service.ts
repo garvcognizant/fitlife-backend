@@ -38,6 +38,7 @@ export class FitnessCalculatorService {
     const base = (10 * user.weightKg) + (6.25 * user.heightCm) - (5 * user.age);
     if (user.gender === 'Male')   return Math.round(base + 5);
     if (user.gender === 'Female') return Math.round(base - 161);
+    if (!user.gender) return Math.round(base - 78); // No gender set yet
     return Math.round(base - 78); // Other
   }
 
@@ -111,30 +112,6 @@ export class FitnessCalculatorService {
     return Math.round(user.weightKg * 35);
   }
 
-  /** Estimate workout calories using MET values (needs user weight) */
-  estimateWorkoutCalories(exerciseType: string, durationMin: number | null | undefined,
-                           sets: number | null | undefined, reps: number | null | undefined,
-                           weightKg: number): number {
-    if (!durationMin && !sets) return 50;
-    // MET-based: cal = MET × weight_kg × duration_hr
-    const metValues: Record<string, number> = {
-      'Cardio': 8.0,
-      'HIIT': 10.0,
-      'Strength': 5.0,
-      'Flexibility': 2.5,
-      'Sports': 7.0,
-      'Other': 4.0
-    };
-    const met = metValues[exerciseType] || 4.0;
-    if (durationMin) {
-      return Math.round(met * weightKg * (durationMin / 60));
-    }
-    // Strength with sets/reps: ~0.1 kcal per rep per kg/70kg factor
-    if (sets && reps) {
-      return Math.round(sets * reps * (weightKg / 70) * 0.5);
-    }
-    return 50;
-  }
 
   getStats(user: User | null): FitnessStats | null {
     if (!user) return null;

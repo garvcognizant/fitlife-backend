@@ -3,16 +3,23 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { FitnessCalculatorService } from '../../services/fitness-calculator.service';
+import { WaterService } from '../../services/water.service';
+import { NutritionService } from '../../services/nutrition.service';
+import { ProgressAvatarComponent } from '../../shared/progress-avatar/progress-avatar.component';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ProgressAvatarComponent],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss'
 })
 export class ProfileComponent {
   authService = inject(AuthService);
+  private calc = inject(FitnessCalculatorService);
+  private waterService = inject(WaterService);
+  private nutritionService = inject(NutritionService);
   private toastService = inject(ToastService);
   private router = inject(Router);
 
@@ -30,24 +37,21 @@ export class ProfileComponent {
   fitnessGoals = ['Lose Weight', 'Build Muscle', 'Maintain', 'Improve Endurance'];
 
   get user() { return this.authService.currentUser(); }
-  get bmi() { return this.authService.getBMI(); }
-  get bmiLabel() { return this.authService.getBMILabel(); }
-  get bmiColor(): string {
-    const b = this.bmi;
-    if (b === 0) return 'var(--text-muted)';
-    if (b < 18.5) return 'var(--red-primary)';
-    if (b < 25) return 'var(--green-primary)';
-    if (b < 30) return 'var(--orange-primary)';
-    return 'var(--red-primary)';
-  }
+  get stats() { return this.calc.getStats(this.user); }
+  get bmi() { return this.stats?.bmi ?? 0; }
+  get bmiLabel() { return this.stats?.bmiLabel ?? 'N/A'; }
+  get bmiColor() { return this.stats?.bmiColor ?? 'var(--text-muted)'; }
+  get nutritionPct() { return this.nutritionService.getPercentages().calories; }
+  get hydrationPct() { return this.waterService.progressPct; }
 
   toggleEdit(): void {
     if (!this.isEditing && this.user) {
       this.form = {
         fullName: this.user.fullName, email: this.user.email,
-        age: this.user.age, gender: this.user.gender,
+        age: this.user.age, gender: this.user.gender || 'Male',
         heightCm: this.user.heightCm, weightKg: this.user.weightKg,
-        activityLevel: this.user.activityLevel, fitnessGoal: this.user.fitnessGoal
+        activityLevel: this.user.activityLevel || 'Moderately Active',
+        fitnessGoal: this.user.fitnessGoal || 'Maintain'
       };
     }
     this.isEditing = !this.isEditing;
@@ -69,9 +73,6 @@ export class ProfileComponent {
     const result = await this.authService.updateProfile(this.form);
     if (result) {
       this.isEditing = false;
-      this.toastService.success('Profile updated successfully ✅');
-    } else {
-      this.toastService.error('Failed to update profile');
     }
   }
 

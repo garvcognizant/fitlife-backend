@@ -5,6 +5,8 @@ import { authGuard } from './guards/auth.guard';
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent) },
   { path: 'register', loadComponent: () => import('./pages/register/register.component').then(m => m.RegisterComponent) },
+  { path: 'forgot-password', loadComponent: () => import('./pages/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent) },
+  { path: 'reset-password', redirectTo: 'forgot-password' },
   {
     path: '',
     component: MainLayoutComponent,
@@ -16,6 +18,7 @@ export const routes: Routes = [
       { path: 'goals', loadComponent: () => import('./pages/goals/goals.component').then(m => m.GoalsComponent) },
       { path: 'history', loadComponent: () => import('./pages/history/history.component').then(m => m.HistoryComponent) },
       { path: 'profile', loadComponent: () => import('./pages/profile/profile.component').then(m => m.ProfileComponent) },
+      { path: 'water', loadComponent: () => import('./pages/water/water.component').then(m => m.WaterComponent) },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]
   },

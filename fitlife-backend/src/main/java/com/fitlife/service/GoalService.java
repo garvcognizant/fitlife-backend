@@ -1,11 +1,14 @@
 package com.fitlife.service;
 
 import com.fitlife.dto.GoalDto;
+import com.fitlife.exception.ForbiddenException;
+import com.fitlife.exception.NotFoundException;
 import com.fitlife.model.Goal;
 import com.fitlife.model.User;
 import com.fitlife.repository.GoalRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,6 +23,7 @@ public class GoalService {
                 .stream().map(GoalDto::from).toList();
     }
 
+    @Transactional
     public GoalDto createGoal(User user, GoalDto dto) {
         Goal goal = Goal.builder()
                 .user(user)
@@ -33,11 +37,12 @@ public class GoalService {
         return GoalDto.from(goalRepository.save(goal));
     }
 
+    @Transactional
     public GoalDto updateGoal(Long userId, Long goalId, GoalDto dto) {
         Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new RuntimeException("Goal not found"));
+                .orElseThrow(() -> new NotFoundException("Goal not found"));
         if (!goal.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Access denied to this goal");
         }
 
         if (dto.getTitle() != null) goal.setTitle(dto.getTitle());
@@ -47,18 +52,21 @@ public class GoalService {
         if (dto.getDeadline() != null) goal.setDeadline(dto.getDeadline());
         if (dto.getCompleted() != null) goal.setCompleted(dto.getCompleted());
 
-        if (goal.getCurrentValue() >= goal.getTargetValue()) {
+        // Auto-complete when current >= target (with null safety)
+        if (goal.getCurrentValue() != null && goal.getTargetValue() != null
+                && goal.getCurrentValue() >= goal.getTargetValue()) {
             goal.setCompleted(true);
         }
 
         return GoalDto.from(goalRepository.save(goal));
     }
 
+    @Transactional
     public void deleteGoal(Long userId, Long goalId) {
         Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new RuntimeException("Goal not found"));
+                .orElseThrow(() -> new NotFoundException("Goal not found"));
         if (!goal.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Unauthorized");
+            throw new ForbiddenException("Access denied to this goal");
         }
         goalRepository.delete(goal);
     }

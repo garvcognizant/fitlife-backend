@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
+import { ToastService } from './toast.service';
 
 export interface Goal {
   id: number;
@@ -19,32 +20,62 @@ export class GoalService {
   goals = signal<Goal[]>([]);
   private apiUrl = `${environment.apiUrl}/goals`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private toast: ToastService) {}
 
   loadGoals(): void {
     this.http.get<Goal[]>(this.apiUrl).subscribe({
-      next: (data) => this.goals.set(data)
+      next: (data) => this.goals.set(data),
+      error: (err) => {
+        const message = err.error?.error || 'Failed to load goals';
+        this.toast.error(message);
+      }
     });
   }
 
   addGoal(goal: Partial<Goal>): Promise<Goal> {
     return new Promise((resolve, reject) => {
       this.http.post<Goal>(this.apiUrl, goal).subscribe({
-        next: (g) => { this.goals.update(list => [...list, g]); resolve(g); },
-        error: reject
+        next: (g) => {
+          this.goals.update(list => [...list, g]);
+          this.toast.success('Goal created successfully');
+          resolve(g);
+        },
+        error: (err) => {
+          const message = err.error?.error || 'Failed to create goal';
+          this.toast.error(message);
+          reject(err);
+        }
       });
     });
   }
 
-  updateGoal(id: number, updates: Partial<Goal>): void {
-    this.http.put<Goal>(`${this.apiUrl}/${id}`, updates).subscribe({
-      next: (g) => this.goals.update(list => list.map(x => x.id === id ? g : x))
+  updateGoal(id: number, updates: Partial<Goal>): Promise<Goal> {
+    return new Promise((resolve, reject) => {
+      this.http.put<Goal>(`${this.apiUrl}/${id}`, updates).subscribe({
+        next: (g) => {
+          this.goals.update(list => list.map(x => x.id === id ? g : x));
+          this.toast.success('Goal updated successfully');
+          resolve(g);
+        },
+        error: (err) => {
+          const message = err.error?.error || 'Failed to update goal';
+          this.toast.error(message);
+          reject(err);
+        }
+      });
     });
   }
 
   deleteGoal(id: number): void {
     this.http.delete(`${this.apiUrl}/${id}`).subscribe({
-      next: () => this.goals.update(list => list.filter(g => g.id !== id))
+      next: () => {
+        this.goals.update(list => list.filter(g => g.id !== id));
+        this.toast.success('Goal deleted successfully');
+      },
+      error: (err) => {
+        const message = err.error?.error || 'Failed to delete goal';
+        this.toast.error(message);
+      }
     });
   }
 
@@ -54,7 +85,7 @@ export class GoalService {
   getOverallProgress(): number {
     const active = this.getActiveGoals();
     if (active.length === 0) return 0;
-    const total = active.reduce((sum, g) => sum + Math.min(100, (g.currentValue / g.targetValue) * 100), 0);
+    const total = active.reduce((sum, g) => sum + Math.min(100, g.targetValue > 0 ? (g.currentValue / g.targetValue) * 100 : 0), 0);
     return Math.round(total / active.length);
   }
 

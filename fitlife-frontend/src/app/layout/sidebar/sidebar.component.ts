@@ -36,6 +36,10 @@ import { AuthService } from '../../services/auth.service';
           <span class="material-icons-round">history</span>
           <span class="nav-label">History</span>
         </a>
+        <a routerLink="/water" routerLinkActive="active" class="nav-item" id="nav-water">
+          <span class="material-icons-round">local_drink</span>
+          <span class="nav-label">Hydration</span>
+        </a>
         <a routerLink="/profile" routerLinkActive="active" class="nav-item" id="nav-profile">
           <span class="material-icons-round">person</span>
           <span class="nav-label">Profile</span>
