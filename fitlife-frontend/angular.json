@@ -46,6 +46,11 @@
             "outputPath": "dist/fitlife-frontend",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "outputPath": "dist/fitlife-frontend",
+            "index": "src/index.html",
+            "polyfills": [
+              "zone.js"
+            ],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
@@ -90,6 +95,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          },
           "configurations": {
             "production": {
               "buildTarget": "fitlife-frontend:build:production"
